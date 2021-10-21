@@ -1,0 +1,8 @@
+{
+    "files.associations": {
+        "*.rmd": "markdown",
+        "un.h": "c",
+        "stdlib.h": "c"
+    },
+    "cSpell.words": ["alloc"]
+}
