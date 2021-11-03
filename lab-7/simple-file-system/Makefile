@@ -1,7 +1,7 @@
 CXX= gcc
 # CXXFLAGS= 	-g -gdwarf-2 -std=gnu++11 -Wall -Iinclude -fPIC
 CXXFLAGS=   -Wall -Iinclude -fPIC 
-LDFLAGS=	-Llib 
+LDFLAGS=	-Llib
 AR=		ar
 ARFLAGS=	rcs
 
@@ -23,7 +23,7 @@ $(LIB_STATIC):		$(LIB_OBJECTS) $(LIB_HEADERS)
 	$(AR) $(ARFLAGS) $@ $(LIB_OBJECTS)
 
 $(SHELL_PROGRAM):	$(SHELL_OBJECTS) $(LIB_STATIC)
-	$(CXX) $(LDFLAGS) -o $@ $(SHELL_OBJECTS) -lsfs
+	$(CXX) $(LDFLAGS) -o $@ $(SHELL_OBJECTS) -lsfs -lm
 
 test:	$(SHELL_PROGRAM)
 	@for test_script in tests/test_*.sh; do $${test_script}; done
