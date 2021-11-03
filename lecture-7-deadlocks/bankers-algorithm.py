@@ -58,10 +58,10 @@ allocation = np.array(allocation)
 
 need = np.subtract(max_request, allocation)
 
-print(available)
-print(max_request)
-print(allocation)
-print(need)
+print('available\n', available)
+print('max_request\n', max_request)
+print('allocation\n', allocation)
+print('need\n', need)
 
 # print(max_request[0])
 # print(allocation[0])
