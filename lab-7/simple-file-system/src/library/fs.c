@@ -11,39 +11,38 @@
 
 // Debug file system -----------------------------------------------------------
 
-void debug(Disk *disk) {
+void debug(Disk *disk)
+{
     Block block;
 
     // Read Superblock
-    
+
     disk->readDisk(disk, 0, block.Data);
-    
+
     printf("SuperBlock:\n");
-    printf("    %u blocks\n"         , block.Super.Blocks);
-    printf("    %u inode blocks\n"   , block.Super.InodeBlocks);
-    printf("    %u inodes\n"         , block.Super.Inodes);
-    
-    
+    printf("    %u blocks\n", block.Super.Blocks);
+    printf("    %u inode blocks\n", block.Super.InodeBlocks);
+    printf("    %u inodes\n", block.Super.Inodes);
+
     // Read Inode blocks
-    
 }
 
 // Format file system ----------------------------------------------------------
 
-bool format(Disk *disk) {
-    
+bool format(Disk *disk)
+{
+
     // Write superblock
-    
+
     // Clear all other blocks
-    
+
     return true;
 }
 
-
-
 // Mount file system -----------------------------------------------------------
 
-bool mount(Disk *disk) {
+bool mount(Disk *disk)
+{
     // Read superblock
 
     // Set device and mount
@@ -57,7 +56,8 @@ bool mount(Disk *disk) {
 
 // Create inode ----------------------------------------------------------------
 
-size_t create() {
+size_t create()
+{
     // Locate free inode in inode table
 
     // Record inode if found
@@ -66,7 +66,8 @@ size_t create() {
 
 // Remove inode ----------------------------------------------------------------
 
-bool removeInode(size_t inumber) {
+bool removeInode(size_t inumber)
+{
     // Load inode information
 
     // Free direct blocks
@@ -79,14 +80,16 @@ bool removeInode(size_t inumber) {
 
 // Inode stat ------------------------------------------------------------------
 
-size_t stat(size_t inumber) {
+size_t stat(size_t inumber)
+{
     // Load inode information
     return 0;
 }
 
 // Read from inode -------------------------------------------------------------
 
-size_t readInode(size_t inumber, char *data, size_t length, size_t offset) {
+size_t readInode(size_t inumber, char *data, size_t length, size_t offset)
+{
     // Load inode information
 
     // Adjust length
@@ -97,9 +100,10 @@ size_t readInode(size_t inumber, char *data, size_t length, size_t offset) {
 
 // Write to inode --------------------------------------------------------------
 
-size_t writeInode(size_t inumber, char *data, size_t length, size_t offset) {
+size_t writeInode(size_t inumber, char *data, size_t length, size_t offset)
+{
     // Load inode
-    
+
     // Write block and copy to data
     return 0;
 }
