@@ -17,6 +17,60 @@ bool hasDiskMounted()
     return selfDisk != NULL && selfDisk->mounted(selfDisk);
 }
 
+bool initFreeBlocks()
+{
+    // Allocate free block bitmap
+    Block block;
+    ushort inodeIdx;
+    uint32_t inodeBlock = 1;
+    Inode inode;
+
+    free(bitmap);
+    bitmap = calloc(superBlock->Super.Blocks, sizeof(int));
+
+    bitmap[0] = 1; // mark super block as used
+
+    while (inodeBlock <= superBlock->Super.InodeBlocks)
+    {
+        bitmap[inodeBlock] = 1; // mark inode as used
+        inodeIdx = 0;
+        selfDisk->readDisk(selfDisk, inodeBlock++, block.Data);
+        while (inodeIdx < INODES_PER_BLOCK)
+        {
+            inode = block.Inodes[inodeIdx++];
+
+            if (inode.Valid == 0)
+            {
+                continue;
+            }
+
+            for (ushort direct = 0; direct < POINTERS_PER_INODE; direct++)
+            {
+                if (inode.Direct[direct] != 0)
+                {
+                    bitmap[inode.Direct[direct]] = 1; // mark data block as used
+                }
+            }
+        }
+    }
+}
+
+ssize_t allocFreeBlocks()
+{
+    if (!hasDiskMounted())
+        return -1;
+
+    for (int i = superBlock->Super.InodeBlocks; i < superBlock->Super.Blocks; i++)
+    {
+        if (bitmap[i] == 0)
+        {
+            return i;
+        }
+    }
+
+    return -1;
+}
+
 bool loadInode(size_t inumber, Inode *inode)
 {
     if (inumber >= superBlock->Super.Inodes)
@@ -131,11 +185,6 @@ bool mount(Disk *disk)
         return false;
     }
 
-    Block block;
-    uint32_t inodeBlock = 1;
-    ushort inodeIdx;
-    Inode inode;
-
     // Read superblock
     free(superBlock);
     superBlock = calloc(1, sizeof(Block));
@@ -151,37 +200,11 @@ bool mount(Disk *disk)
     // what to do???
 
     // Allocate free block bitmap
-    free(bitmap);
-
-    bitmap = calloc(superBlock->Super.Blocks, sizeof(int));
-
-    bitmap[0] = 1; // mark super block as used
-
-    while (inodeBlock <= superBlock->Super.InodeBlocks)
+    if (!initFreeBlocks())
     {
-        bitmap[inodeBlock] = 1; // mark inode as used
-        inodeIdx = 0;
-        disk->readDisk(disk, inodeBlock++, block.Data);
-        while (inodeIdx < INODES_PER_BLOCK)
-        {
-            inode = block.Inodes[inodeIdx++];
-
-            if (inode.Valid == 0)
-            {
-                continue;
-            }
-
-            for (ushort direct = 0; direct < POINTERS_PER_INODE; direct++)
-            {
-                if (inode.Direct[direct] != 0)
-                {
-                    bitmap[inode.Direct[direct]] = 1; // mark data block as used
-                }
-            }
-        }
+        return false;
     }
 
-    printf("HI\n");
     for (int i = 0; i < superBlock->Super.Blocks; i++)
     {
         printf("%d => %d\n", i, bitmap[i]);
@@ -262,7 +285,6 @@ size_t readInode(size_t inumber, char *data, size_t length, size_t offset)
         if (inode.Direct[startBlock] == 0)
             break;
 
-        bzero(&block, BLOCK_SIZE);
         selfDisk->readDisk(selfDisk, inode.Direct[startBlock], block.Data);
 
         if (strlen(buffer) + strlen(block.Data) >= length)
@@ -270,6 +292,7 @@ size_t readInode(size_t inumber, char *data, size_t length, size_t offset)
 
         strncat(buffer, block.Data + offset, length - strlen(buffer));
 
+        bzero(&block, BLOCK_SIZE);
         offset = 0;
         startBlock++;
     }
