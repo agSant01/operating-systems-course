@@ -234,7 +234,7 @@ void do_create(Disk *disk, FileSystem *fs, int args, char *arg1, char *arg2)
 		return;
 	}
 
-	size_t inumber = fs->create();
+	ssize_t inumber = fs->create();
 	if (inumber >= 0)
 	{
 		printf("created inode %d.\n", inumber);
@@ -361,7 +361,7 @@ bool copyin(FileSystem *fs, const char *path, size_t inumber)
 			break;
 		}
 
-		size_t actual = fs->writeInode(inumber, buffer, result, offset);
+		ssize_t actual = fs->writeInode(inumber, buffer, result, offset);
 		if (actual < 0)
 		{
 			fprintf(stderr, "fs->write returned invalid result %d\n", actual);
