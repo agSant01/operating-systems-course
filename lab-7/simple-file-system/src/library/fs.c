@@ -306,10 +306,75 @@ size_t readInode(size_t inumber, char *data, size_t length, size_t offset)
 
 // Write to inode --------------------------------------------------------------
 
-size_t writeInode(size_t inumber, char *data, size_t length, size_t offset)
+ssize_t writeInode(size_t inumber, char *data, size_t length, size_t offset)
 {
     // Load inode
+    Inode inode;
+    if (!loadInode(inumber, &inode))
+    {
+        return -1;
+    }
+
+    if (inode.Valid == 0)
+    {
+        return -1;
+    }
 
     // Write block and copy to data
-    return 0;
+    Block block;
+    int direct = 0;
+    size_t written = 0,
+           freeblk;
+
+    while (written < length && direct < POINTERS_PER_INODE)
+    {
+        strncpy(block.Data, data + written, BLOCK_SIZE);
+        freeblk = allocFreeBlock();
+
+        if (freeblk <= 0)
+            return -1;
+
+        selfDisk->writeDisk(selfDisk, freeblk, block.Data);
+        inode.Direct[direct] = freeblk;
+        written += strlen(block.Data);
+        direct++;
+    }
+
+    if (written < length)
+    {
+        // use indirect
+        size_t indblk = allocFreeBlock();
+
+        if (indblk <= 0)
+            return -1;
+        inode.Indirect = indblk;
+
+        Block pointers;
+
+        for (size_t indirect = 0; indirect < POINTERS_PER_BLOCK; indirect++)
+        {
+            strncpy(block.Data, data + written, BLOCK_SIZE);
+            freeblk = allocFreeBlock();
+
+            if (freeblk <= 0)
+                return -1;
+
+            selfDisk->writeDisk(selfDisk, freeblk, block.Data);
+            pointers.Pointers[indirect] = freeblk;
+
+            written += strlen(block.Data);
+
+            if (written >= length)
+                break;
+
+            indirect++;
+        }
+
+        selfDisk->writeDisk(selfDisk, indblk, pointers.Data);
+    }
+
+    inode.Size = written;
+    saveInode(inumber, &inode);
+
+    return written;
 }
