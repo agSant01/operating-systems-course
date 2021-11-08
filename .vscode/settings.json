@@ -4,5 +4,5 @@
         "un.h": "c",
         "stdlib.h": "c"
     },
-    "cSpell.words": ["alloc"]
+    "cSpell.words": ["alloc", "inumber", "nblocks"]
 }
