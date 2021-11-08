@@ -73,14 +73,47 @@ ssize_t allocFreeBlocks()
 
 bool loadInode(size_t inumber, Inode *inode)
 {
-    if (inumber >= superBlock->Super.Inodes)
+    if (!hasDiskMounted())
     {
         return false;
     }
-    size_t blockNumber = (inumber / INODES_PER_BLOCK) + 1;
+
+    if (inumber < 0 || inumber >= superBlock->Super.Inodes)
+    {
+        return false;
+    }
+
+    size_t inodeperblk = superBlock->Super.Inodes / superBlock->Super.InodeBlocks;
+    size_t blockNumber = (inumber / inodeperblk) + 1;
     Block block;
     selfDisk->readDisk(selfDisk, blockNumber, block.Data);
-    memcpy(inode, &block.Inodes[inumber % INODES_PER_BLOCK], sizeof(Inode));
+    memcpy(inode, &block.Inodes[inumber % inodeperblk], sizeof(Inode));
+
+    return true;
+}
+
+bool saveInode(size_t inumber, Inode *inode)
+{
+    if (!hasDiskMounted())
+    {
+        return false;
+    }
+
+    if (inumber < 0 || inumber >= superBlock->Super.Inodes)
+    {
+        return false;
+    }
+
+    size_t blockNumber = (inumber / INODES_PER_BLOCK) + 1;
+
+    Block block;
+
+    selfDisk->readDisk(selfDisk, blockNumber, block.Data);
+
+    memcpy(&block.Inodes[inumber], inode, sizeof(Inode));
+
+    selfDisk->writeDisk(selfDisk, blockNumber, block.Data);
+
     return true;
 }
 
@@ -253,11 +286,6 @@ size_t stat(size_t inumber)
 
 size_t readInode(size_t inumber, char *data, size_t length, size_t offset)
 {
-    if (!hasDiskMounted())
-    {
-        return 0;
-    }
-
     // Load inode information
     Inode inode;
     if (!loadInode(inumber, &inode))
