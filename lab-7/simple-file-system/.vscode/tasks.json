@@ -1,0 +1,19 @@
+{
+    "tasks": [
+        {
+            "type": "shell",
+            "label": "build simple fs",
+            "command": "",
+            "args": ["make", "clean;", "make;"],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "reveal": "always"
+            },
+            "detail": "me."
+        }
+    ],
+    "version": "2.0.0"
+}
