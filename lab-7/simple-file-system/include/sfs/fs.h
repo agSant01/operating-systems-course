@@ -47,7 +47,7 @@ typedef struct FileSystem
 
     ssize_t (*create)();
     bool (*removeInode)(size_t inumber);
-    size_t (*stat)(size_t inumber);
+    ssize_t (*stat)(size_t inumber);
 
     size_t (*readInode)(size_t inumber, char *data, size_t length, size_t offset);
     ssize_t (*writeInode)(size_t inumber, char *data, size_t length, size_t offset);

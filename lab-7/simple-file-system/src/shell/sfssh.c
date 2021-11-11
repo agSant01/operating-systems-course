@@ -281,7 +281,7 @@ void do_stat(Disk *disk, FileSystem *fs, int args, char *arg1, char *arg2)
 	}
 
 	size_t inumber = atoi(arg1);
-	size_t bytes = fs->stat(inumber);
+	ssize_t bytes = fs->stat(inumber);
 	if ((int)bytes >= 0)
 	{
 		printf("inode %ld has size %zd bytes.\n", inumber, bytes);

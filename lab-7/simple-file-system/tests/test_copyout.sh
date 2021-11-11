@@ -41,6 +41,12 @@ copyout 2 $SCRATCH/2.txt
 copyout 9 $SCRATCH/9.txt
 EOF
 
+# cat $SCRATCH/2.txt
+# cat $SCRATCH/9.txt
+
+# echo $(md5sum $SCRATCH/2.txt | awk '{print $1}')
+# echo $(md5sum $SCRATCH/9.txt | awk '{print $1}')
+
 echo -n "Testing copyout in data/image.200 ... "
 if [ $(md5sum $SCRATCH/1.txt | awk '{print $1}') = '0af623d6d8cb0a514816e17c7386a298' ] &&
    [ $(md5sum $SCRATCH/2.txt | awk '{print $1}') = '307fe5cee7ac87c3b06ea5bda80301ee' ] &&
