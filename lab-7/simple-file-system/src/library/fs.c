@@ -16,8 +16,37 @@ Block *superBlock;
 /**
  *  Cache-like implementation for retrieving most recent accessed INODE
  */
-Inode *lastRecentlyUsed;
-size_t LRU_INUMBER;
+#define CACHE_LEN 8
+
+Inode *lruinodes[CACHE_LEN] = {0};
+size_t *lruinumber[CACHE_LEN] = {0};
+
+/**
+ * @brief Stores the instance of valid iNode in "inode" if there is a cache hit
+ * 
+ * @param inumber inode number
+ * @param inode inode struct to store variable
+ * @return bool 
+ */
+bool cacheLookup(size_t inumber, Inode *inode)
+{
+    int cp = inumber % CACHE_LEN;
+    if (lruinumber[cp] == inumber)
+    {
+        inode = lruinodes[cp];
+        return false;
+    }
+    memset(inode, 0, sizeof(Inode));
+    return false;
+}
+
+bool cacheUpdate(size_t inumber, Inode *inode)
+{
+    int cp = inumber % CACHE_LEN;
+    lruinumber[cp] = inumber;
+    lruinodes[cp] = inode;
+    return true;
+}
 
 int gw(int a)
 {
@@ -191,12 +220,8 @@ bool loadInode(size_t inumber, Inode *inode)
     }
 
     /* Cache lookup */
-    if (lastRecentlyUsed != NULL && inumber == LRU_INUMBER)
-    {
-        // printf("Cache hit. Inode:%d...\n", inumber);
-        inode = lastRecentlyUsed;
-        return true; // Cache hit
-    }
+    if (cacheLookup(inumber, inode))
+        return true;
 
     /* Cache miss. Read inode from memory */
     size_t inodeperblk = superBlock->Super.Inodes / superBlock->Super.InodeBlocks;
@@ -206,8 +231,7 @@ bool loadInode(size_t inumber, Inode *inode)
     memcpy(inode, &block.Inodes[inumber % inodeperblk], sizeof(Inode));
 
     /* Update inode Cache references */
-    lastRecentlyUsed = inode;
-    LRU_INUMBER = inumber;
+    cacheUpdate(inumber, inode);
 
     return true;
 }
@@ -417,7 +441,6 @@ ssize_t create()
     bzero(&block.Inodes[adjustedinumber], sizeof(Inode));
     block.Inodes[adjustedinumber].Valid = 1;
     selfDisk->writeDisk(selfDisk, bnumber, block.Data);
-    printf("inode valid %d\n", block.Inodes[adjustedinumber].Valid);
 
     return inodeidx;
 }
@@ -471,36 +494,40 @@ bool removeInode(size_t inumber)
 
 // Inode stat ------------------------------------------------------------------
 
-size_t stat(size_t inumber)
+ssize_t stat(size_t inumber)
 {
-    // if (selfDisk == NULL)
-    // {
-    //     fprintf(stderr, "Mount disk first...\n");
-    //     return -1;
-    // }
+    if (selfDisk == NULL)
+    {
+        fprintf(stderr, "Mount disk first...\n");
+        return -1;
+    }
+
     // Load inode information
     Inode inode;
-    loadInode(inumber, &inode);
-    // if (!loadInode(inumber, &inode))
-    // {
-    //     fprintf(stderr, "Invalid inode...\n");
-    //     return -1;
-    // };
+    if (!loadInode(inumber, &inode))
+    {
+        fprintf(stderr, "Invalid inode...\n");
+        return -1;
+    };
 
-    // fprintf(stderr, "Direct:\n");
-    // for (int i = 0; i < POINTERS_PER_INODE; i++)
-    //     fprintf(stderr, "    [%d] => %ld\n", i, inode.Direct[i]);
-    // fprintf(stderr, "Indirect => %ld\n", inode.Indirect);
+    fprintf(stderr, "Direct:\n");
+    for (int i = 0; i < POINTERS_PER_INODE; i++)
+        fprintf(stderr, "    [%d] => %u\n", i, inode.Direct[i]);
 
-    // Block block;
-    // selfDisk->readDisk(selfDisk, inode.Indirect, block.Data);
-    // for (int i = 0; i < POINTERS_PER_BLOCK; i++)
-    // {
-    //     if (block.Pointers[i] == 0)
-    //         break;
-    //     fprintf(stderr, "    [%d] => %ld\n", i, block.Pointers[i]);
-    // }
-    // fprintf(stderr, "Valid = %ld\n", inode.Valid);
+    if (inode.Indirect != 0)
+    {
+        Block block;
+        selfDisk->readDisk(selfDisk, inode.Indirect, block.Data);
+        fprintf(stderr, "Indirect => %u\n", inode.Indirect);
+        for (int i = 0; i < POINTERS_PER_BLOCK; i++)
+        {
+            if (block.Pointers[i] == 0)
+                break;
+            fprintf(stderr, "    [%d] => %u\n", i, block.Pointers[i]);
+        }
+        fprintf(stderr, "Valid = %u\n", inode.Valid);
+    }
+
     return inode.Size;
 }
 
@@ -599,15 +626,17 @@ ssize_t writeInode(size_t inumber, char *data, size_t length, size_t offset)
 
     // Write block and copy to data
     Block block;
-    uint32_t written = 0, freeblk;
+    uint32_t written = 0;
+    ssize_t freeblk;
     size_t offsetedDataBlock = offset / BLOCK_SIZE;
     offset %= BLOCK_SIZE;
-
-    while (written < length && offsetedDataBlock < POINTERS_PER_INODE)
+    printf("Write on direct...\n");
+    while (data[written] != 0 && offsetedDataBlock < POINTERS_PER_INODE)
     {
         freeblk = allocFreeBlock(inode.Direct[offsetedDataBlock]);
         if (freeblk <= 0)
             return -1;
+        printf("Free block:%d\n", freeblk);
         inode.Direct[offsetedDataBlock] = freeblk;
 
         if (offset > 0)
@@ -617,27 +646,32 @@ ssize_t writeInode(size_t inumber, char *data, size_t length, size_t offset)
         strncpy(block.Data + offset, data + written, fmin(BLOCK_SIZE, length - written));
 
         selfDisk->writeDisk(selfDisk, freeblk, block.Data);
-        written += strlen(block.Data);
+        written += strlen(block.Data + offset);
 
         bzero(block.Data, BLOCK_SIZE);
 
         offset = 0;
         offsetedDataBlock++;
     }
-    // printf("Ended writting to direct...\n");
-    // printf("Wrote %d bytes of %d...\n", written, length);
+    // mark the end of data
+    // if (offsetedDataBlock < POINTERS_PER_INODE)
+    //     inode.Direct[offsetedDataBlock] = 0;
+
+    fprintf(stderr, "Ended writting to direct...\n");
+    fprintf(stderr, "Wrote %d bytes of %d...\n", written, length);
 
     // still data to write,
     // use indirect data
-    if (written < length)
+    if (data[written] != 0)
     {
-        // printf("Use indirect...\n");
+        fprintf(stderr, "Use indirect...\n");
         uint32_t indblk = allocFreeBlock(inode.Indirect);
         if (indblk <= 0)
         {
             return -1;
         }
-        // printf("indirect data block: %d\n", indblk);
+        printf("Indirect block:%d\n", indblk);
+        fprintf(stderr, "Indirect data block: %d\n", indblk);
         inode.Indirect = indblk;
 
         // adjust offsetedDataBlock to start at 0 to account for zero-start
@@ -646,25 +680,34 @@ ssize_t writeInode(size_t inumber, char *data, size_t length, size_t offset)
 
         Block pointers;
         selfDisk->readDisk(selfDisk, indblk, pointers.Data);
-        while (written < length && offsetedDataBlock < POINTERS_PER_BLOCK)
+
+        while (data[written] != 0 && offsetedDataBlock < POINTERS_PER_BLOCK)
         {
             freeblk = allocFreeBlock(pointers.Pointers[offsetedDataBlock]);
             if (freeblk <= 0)
                 return -1;
+            fprintf(stderr, "Free Blck: %u\n", freeblk);
             pointers.Pointers[offsetedDataBlock] = freeblk;
 
             if (offset > 0)
             {
                 selfDisk->readDisk(selfDisk, freeblk, block.Data);
             }
+
             strncpy(block.Data + offset, data + written, fmin(BLOCK_SIZE, length - written));
+
             selfDisk->writeDisk(selfDisk, freeblk, block.Data);
-            written += strlen(block.Data);
+            written += strlen(block.Data + offset);
+
             bzero(block.Data, BLOCK_SIZE);
 
             offset = 0;
             offsetedDataBlock++;
         }
+
+        // mark the end of data
+        // if (offsetedDataBlock < POINTERS_PER_BLOCK)
+        //     pointers.Pointers[offsetedDataBlock] = 0;
 
         selfDisk->writeDisk(selfDisk, indblk, pointers.Data);
     }

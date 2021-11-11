@@ -15,7 +15,7 @@ disk mounted.
 inode 1 has size 965 bytes.
 stat failed!
 stat failed!
-5 disk block reads
+3 disk block reads
 0 disk block writes
 EOF
 }

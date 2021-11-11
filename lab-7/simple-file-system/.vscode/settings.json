@@ -3,5 +3,5 @@
         "*.rmd": "markdown",
         "stdbool.h": "c"
     },
-    "cSpell.words": ["bnumber"]
+    "cSpell.words": ["bnumber", "lruinumber"]
 }
