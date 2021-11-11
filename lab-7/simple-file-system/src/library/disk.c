@@ -15,8 +15,10 @@
 #include <signal.h>
 
 char signal_msg[256];
+char what[256];
 void handle_sigint(int sig)
 {
+    printf("%s\n", what);
     printf("%s\n", signal_msg);
     exit(0);
 }
@@ -31,7 +33,6 @@ void openDisk(struct Disk *self, const char *path, size_t nblocks)
     FileDescriptor = open(path, O_RDWR | O_CREAT, 0600);
     if (FileDescriptor < 0)
     {
-        char what[BUFSIZ];
         snprintf(what, BUFSIZ, "Unable to open %s: %s", path, strerror(errno));
         strcpy(signal_msg, "ERROR: unable to open the disk.\0");
         signal(SIGINT, handle_sigint);
@@ -40,7 +41,6 @@ void openDisk(struct Disk *self, const char *path, size_t nblocks)
 
     if (ftruncate(FileDescriptor, nblocks * BLOCK_SIZE) < 0)
     {
-        char what[BUFSIZ];
         snprintf(what, BUFSIZ, "Unable to open %s: %s", path, strerror(errno));
         strcpy(signal_msg, "ERROR: unable to open the disk.\0");
         signal(SIGINT, handle_sigint);
@@ -68,8 +68,6 @@ void DiskDestructor(struct Disk *self)
 
 void sanity_check(struct Disk *self, int blocknum, char *data)
 {
-    char what[BUFSIZ];
-
     if (blocknum < 0)
     {
         snprintf(what, BUFSIZ, "blocknum (%d) is negative!", blocknum);
@@ -100,7 +98,6 @@ void readDisk(struct Disk *self, int blocknum, char *data)
     sanity_check(self, blocknum, data);
     if (lseek(FileDescriptor, blocknum * BLOCK_SIZE, SEEK_SET) < 0)
     {
-        char what[BUFSIZ];
         snprintf(what, BUFSIZ, "Unable to lseek %d: %s", blocknum, strerror(errno));
         strcpy(signal_msg, "ERROR: unable to lseek blocknum.\0");
         signal(SIGINT, handle_sigint);
@@ -108,7 +105,6 @@ void readDisk(struct Disk *self, int blocknum, char *data)
 
     if (read(FileDescriptor, data, BLOCK_SIZE) != BLOCK_SIZE)
     {
-        char what[BUFSIZ];
         snprintf(what, BUFSIZ, "Unable to read %d: %s", blocknum, strerror(errno));
         strcpy(signal_msg, "ERROR: unable to read blocknum.\0");
         signal(SIGINT, handle_sigint);
@@ -123,7 +119,6 @@ void writeDisk(struct Disk *self, int blocknum, char *data)
     sanity_check(self, blocknum, data);
     if (lseek(FileDescriptor, blocknum * BLOCK_SIZE, SEEK_SET) < 0)
     {
-        char what[BUFSIZ];
         snprintf(what, BUFSIZ, "Unable to lseek %d: %s", blocknum, strerror(errno));
         strcpy(signal_msg, "ERROR: unable to lseek blocknum.\0");
         signal(SIGINT, handle_sigint);
@@ -132,7 +127,6 @@ void writeDisk(struct Disk *self, int blocknum, char *data)
 
     if (write(FileDescriptor, data, BLOCK_SIZE) != BLOCK_SIZE)
     {
-        char what[BUFSIZ];
         snprintf(what, BUFSIZ, "Unable to write %d: %s", blocknum, strerror(errno));
         strcpy(signal_msg, "ERROR: unable to write blocknum.\0");
         signal(SIGINT, handle_sigint);
