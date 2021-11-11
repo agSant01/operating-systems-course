@@ -1,0 +1,7 @@
+{
+    "files.associations": {
+        "*.rmd": "markdown",
+        "stdbool.h": "c"
+    },
+    "cSpell.words": ["bnumber"]
+}
