@@ -45,11 +45,11 @@ typedef struct FileSystem
 
     bool (*mount)(Disk *disk);
 
-    size_t (*create)();
+    ssize_t (*create)();
     bool (*removeInode)(size_t inumber);
     size_t (*stat)(size_t inumber);
 
     size_t (*readInode)(size_t inumber, char *data, size_t length, size_t offset);
-    size_t (*writeInode)(size_t inumber, char *data, size_t length, size_t offset);
+    ssize_t (*writeInode)(size_t inumber, char *data, size_t length, size_t offset);
 
 } FileSystem;

@@ -95,7 +95,15 @@ int main(int argc, char *argv[])
 			continue;
 		}
 
-		if (streq(cmd, "debug"))
+		if (streq(cmd, "pbm"))
+		{
+			printBitmaps();
+		}
+		else if (streq(cmd, "rws"))
+		{
+			printf("reads:%d | writes:%d\n", Reads, Writes);
+		}
+		else if (streq(cmd, "debug"))
 		{
 			do_debug(disk, fs, args, arg1, arg2);
 		}
@@ -237,7 +245,7 @@ void do_create(Disk *disk, FileSystem *fs, int args, char *arg1, char *arg2)
 	ssize_t inumber = fs->create();
 	if (inumber >= 0)
 	{
-		printf("created inode %d.\n", inumber);
+		printf("created inode %ld.\n", inumber);
 	}
 	else
 	{
@@ -256,7 +264,7 @@ void do_remove(Disk *disk, FileSystem *fs, int args, char *arg1, char *arg2)
 	size_t inumber = atoi(arg1);
 	if (fs->removeInode(inumber))
 	{
-		printf("removed inode %d.\n", inumber);
+		printf("removed inode %ld.\n", inumber);
 	}
 	else
 	{
@@ -276,7 +284,7 @@ void do_stat(Disk *disk, FileSystem *fs, int args, char *arg1, char *arg2)
 	size_t bytes = fs->stat(inumber);
 	if ((int)bytes >= 0)
 	{
-		printf("inode %d has size %zd bytes.\n", inumber, bytes);
+		printf("inode %ld has size %zd bytes.\n", inumber, bytes);
 	}
 	else
 	{
@@ -310,6 +318,8 @@ void do_help(Disk *disk, FileSystem *fs, int args, char *arg1, char *arg2)
 	printf("    stat    <inode>\n");
 	printf("    copyin  <file> <inode>\n");
 	printf("    copyout <inode> <file>\n");
+	printf("    pbm\n");
+	printf("    rws\n");
 	printf("    help\n");
 	printf("    quit\n");
 	printf("    exit\n");
@@ -364,13 +374,13 @@ bool copyin(FileSystem *fs, const char *path, size_t inumber)
 		ssize_t actual = fs->writeInode(inumber, buffer, result, offset);
 		if (actual < 0)
 		{
-			fprintf(stderr, "fs->write returned invalid result %d\n", actual);
+			fprintf(stderr, "fs->write returned invalid result %ld\n", actual);
 			break;
 		}
 		offset += actual;
 		if (actual != result)
 		{
-			fprintf(stderr, "fs->write only wrote %d bytes, not %zd bytes\n", actual, result);
+			fprintf(stderr, "fs->write only wrote %ld bytes, not %zd bytes\n", actual, result);
 			break;
 		}
 	}
