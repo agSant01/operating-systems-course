@@ -19,7 +19,7 @@ Block *superBlock;
 #define CACHE_LEN 8
 
 Inode *lruinodes[CACHE_LEN] = {0};
-size_t *lruinumber[CACHE_LEN] = {0};
+size_t lruinumber[CACHE_LEN] = {0};
 
 /**
  * @brief Stores the instance of valid iNode in "inode" if there is a cache hit
@@ -32,7 +32,8 @@ bool cacheLookup(size_t inumber, Inode *inode) {
     int cp = inumber % CACHE_LEN;
     if (lruinumber[cp] == inumber) {
         inode = lruinodes[cp];
-        return false;
+        printf("Cache hit: %d\n", inumber);
+        return true;
     }
     memset(inode, 0, sizeof(Inode));
     return false;
@@ -445,21 +446,6 @@ ssize_t stat(size_t inumber) {
         fprintf(stderr, "Invalid inode...\n");
         return -1;
     };
-
-    fprintf(stderr, "Direct:\n");
-    for (int i = 0; i < POINTERS_PER_INODE; i++)
-        fprintf(stderr, "    [%d] => %u\n", i, inode.Direct[i]);
-
-    if (inode.Indirect != 0) {
-        Block block;
-        selfDisk->readDisk(selfDisk, inode.Indirect, block.Data);
-        fprintf(stderr, "Indirect => %u\n", inode.Indirect);
-        for (int i = 0; i < POINTERS_PER_BLOCK; i++) {
-            if (block.Pointers[i] == 0) break;
-            fprintf(stderr, "    [%d] => %u\n", i, block.Pointers[i]);
-        }
-        fprintf(stderr, "Valid = %u\n", inode.Valid);
-    }
 
     return inode.Size;
 }
