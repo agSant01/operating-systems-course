@@ -32,7 +32,7 @@ bool cacheLookup(size_t inumber, Inode *inode) {
     int cp = inumber % CACHE_LEN;
     if (lruinumber[cp] == inumber) {
         inode = lruinodes[cp];
-        printf("Cache hit: %d\n", inumber);
+        fprintf(stderr, "Cache hit: %lu\n", inumber);
         return true;
     }
     memset(inode, 0, sizeof(Inode));
@@ -154,10 +154,10 @@ bool initInodeTable() {
                 initFreeBlocks(&block.Inodes[inode]);
             }
         }
-        fprintf(stderr, "InodeBlk: %d\n", inodeblk);
+        fprintf(stderr, "InodeBlk: %lu\n", inodeblk);
     }
 
-    fprintf(stderr, "Total InodeBlocks %d\n", superBlock->Super.InodeBlocks);
+    fprintf(stderr, "Total InodeBlocks %u\n", superBlock->Super.InodeBlocks);
 
     return true;
 }
@@ -554,7 +554,7 @@ ssize_t writeInode(size_t inumber, char *data, size_t length, size_t offset) {
     while (data[written] != 0 && offsetedDataBlock < POINTERS_PER_INODE) {
         freeblk = allocFreeBlock(inode.Direct[offsetedDataBlock]);
         if (freeblk <= 0) return -1;
-        printf("Free block:%d\n", freeblk);
+        printf("Free block: %ld\n", freeblk);
         inode.Direct[offsetedDataBlock] = freeblk;
 
         if (offset > 0) {
@@ -576,7 +576,7 @@ ssize_t writeInode(size_t inumber, char *data, size_t length, size_t offset) {
     //     inode.Direct[offsetedDataBlock] = 0;
 
     fprintf(stderr, "Ended writting to direct...\n");
-    fprintf(stderr, "Wrote %d bytes of %d...\n", written, length);
+    fprintf(stderr, "Wrote %u bytes of %lu...\n", written, length);
 
     // still data to write,
     // use indirect data
@@ -600,7 +600,7 @@ ssize_t writeInode(size_t inumber, char *data, size_t length, size_t offset) {
         while (data[written] != 0 && offsetedDataBlock < POINTERS_PER_BLOCK) {
             freeblk = allocFreeBlock(pointers.Pointers[offsetedDataBlock]);
             if (freeblk <= 0) return -1;
-            fprintf(stderr, "Free Blck: %u\n", freeblk);
+            fprintf(stderr, "Free Blck: %ld\n", freeblk);
             pointers.Pointers[offsetedDataBlock] = freeblk;
 
             if (offset > 0) {
