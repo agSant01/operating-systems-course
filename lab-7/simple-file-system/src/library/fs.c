@@ -11,7 +11,7 @@
 ushort *freeblkmap;
 ushort *inodetable;
 Disk *selfDisk;
-Block *superBlock;
+Block superBlock;
 
 /**
  *  Cache-like implementation for retrieving most recent accessed INODE
@@ -46,17 +46,22 @@ bool cacheUpdate(size_t inumber, Inode *inode) {
     return true;
 }
 
+bool hasDiskMounted() {
+    return selfDisk != NULL && selfDisk->mounted(selfDisk);
+}
+
 int gw(int a) { return log10((double)a) + 1; }
 
 void printBitmaps() {
-    if (superBlock == NULL) {
+    if (!hasDiskMounted()) {
         printf("Must mount disk first.\n");
         return;
     }
+
     int max_;
     printf("\n------------------- Inodes -------------------\n");
-    max_ = gw(superBlock->Super.Inodes) + 1;
-    for (int i = 0; i < superBlock->Super.Inodes; i++) {
+    max_ = gw(superBlock.Super.Inodes) + 1;
+    for (int i = 0; i < superBlock.Super.Inodes; i++) {
         printf("%d", i);
         if (i > 0) {
             printf("%-*s", max_ - gw(i), " ");
@@ -67,8 +72,8 @@ void printBitmaps() {
     }
 
     printf("------------------- Blocks -------------------\n");
-    max_ = gw(superBlock->Super.Blocks) + 1;
-    for (int i = 0; i < superBlock->Super.Blocks; i++) {
+    max_ = gw(superBlock.Super.Blocks) + 1;
+    for (int i = 0; i < superBlock.Super.Blocks; i++) {
         printf("%d", i);
         if (i > 0) {
             printf("%-*s", max_ - gw(i), " ");
@@ -77,10 +82,6 @@ void printBitmaps() {
         }
         printf("=> %d\n", freeblkmap[i]);
     }
-}
-
-bool hasDiskMounted() {
-    return selfDisk != NULL && selfDisk->mounted(selfDisk);
 }
 
 bool initFreeBlocks(Inode *inode) {
@@ -120,10 +121,10 @@ bool initFreeBlocks(Inode *inode) {
  * @return ssize_t
  */
 ssize_t allocFreeBlock(uint32_t bnumber) {
-    if (bnumber != 0 && bnumber < superBlock->Super.Blocks) return bnumber;
+    if (bnumber != 0 && bnumber < superBlock.Super.Blocks) return bnumber;
 
-    for (uint32_t i = superBlock->Super.InodeBlocks;
-         i < superBlock->Super.Blocks; i++) {
+    for (uint32_t i = superBlock.Super.InodeBlocks;
+         i < superBlock.Super.Blocks; i++) {
         if (freeblkmap[i] == 0) {
             freeblkmap[i] = 1;
             return i;
@@ -135,16 +136,16 @@ ssize_t allocFreeBlock(uint32_t bnumber) {
 
 bool initInodeTable() {
     free(inodetable);
-    inodetable = calloc(superBlock->Super.Inodes, sizeof(ushort));
+    inodetable = calloc(superBlock.Super.Inodes, sizeof(ushort));
 
     free(freeblkmap);
-    freeblkmap = calloc(superBlock->Super.Blocks, sizeof(ushort));
+    freeblkmap = calloc(superBlock.Super.Blocks, sizeof(ushort));
     freeblkmap[0] = 1; // mark super block as used
 
     uint32_t inodeperblk =
-        superBlock->Super.Inodes / superBlock->Super.InodeBlocks;
+        superBlock.Super.Inodes / superBlock.Super.InodeBlocks;
     Block block;
-    for (size_t inodeblk = 1; inodeblk <= superBlock->Super.InodeBlocks;
+    for (size_t inodeblk = 1; inodeblk <= superBlock.Super.InodeBlocks;
          inodeblk++) {
         selfDisk->readDisk(selfDisk, inodeblk, block.Data);
         freeblkmap[inodeblk] = 1;
@@ -157,13 +158,13 @@ bool initInodeTable() {
         fprintf(stderr, "InodeBlk: %lu\n", inodeblk);
     }
 
-    fprintf(stderr, "Total InodeBlocks %u\n", superBlock->Super.InodeBlocks);
+    fprintf(stderr, "Total InodeBlocks %u\n", superBlock.Super.InodeBlocks);
 
     return true;
 }
 
 ssize_t allocFreeInode() {
-    size_t tinodes = superBlock->Super.Inodes;
+    size_t tinodes = superBlock.Super.Inodes;
     for (int i = 0; i < tinodes; i++) {
         if (inodetable[i] == 0) {
             inodetable[i] = 1;
@@ -179,7 +180,7 @@ bool loadInode(size_t inumber, Inode *inode) {
         return false;
     }
 
-    if (inumber < 0 || inumber >= superBlock->Super.Inodes) {
+    if (inumber < 0 || inumber >= superBlock.Super.Inodes) {
         return false;
     }
 
@@ -192,7 +193,7 @@ bool loadInode(size_t inumber, Inode *inode) {
 
     /* Cache miss. Read inode from memory */
     size_t inodeperblk =
-        superBlock->Super.Inodes / superBlock->Super.InodeBlocks;
+        superBlock.Super.Inodes / superBlock.Super.InodeBlocks;
     size_t blockNumber = (inumber / inodeperblk) + 1;
     Block block;
     selfDisk->readDisk(selfDisk, blockNumber, block.Data);
@@ -207,12 +208,12 @@ bool loadInode(size_t inumber, Inode *inode) {
 bool saveInode(size_t inumber, Inode *inode) {
     if (!hasDiskMounted()) return false;
 
-    if (inumber < 0 || inumber >= superBlock->Super.Inodes) {
+    if (inumber < 0 || inumber >= superBlock.Super.Inodes) {
         return false;
     }
 
     uint32_t inodesperblk =
-        superBlock->Super.Inodes / superBlock->Super.InodeBlocks;
+        superBlock.Super.Inodes / superBlock.Super.InodeBlocks;
     uint32_t blockNumber = (inumber / inodesperblk) + 1;
 
     Block block;
@@ -292,11 +293,11 @@ void debug(Disk *disk) {
 // Format file system ----------------------------------------------------------
 
 bool format(Disk *disk) {
-    if (selfDisk != NULL) {
+    if (hasDiskMounted()) {
         return false;
     }
 
-    Block block;
+    Block block = {0};
 
     uint32_t inodeBlocks = (uint32_t)ceil(0.10 * disk->Blocks);
 
@@ -314,8 +315,7 @@ bool format(Disk *disk) {
     // Clear all other blocks
     uint32_t blockIdx = 1;
     while (blockIdx < disk->Blocks) {
-        disk->writeDisk(disk, blockIdx, block.Data);
-        blockIdx++;
+        disk->writeDisk(disk, blockIdx++, block.Data);
     }
 
     return true;
@@ -329,23 +329,21 @@ bool mount(Disk *disk) {
     }
 
     // Read superblock
-    free(superBlock);
-    superBlock = calloc(1, sizeof(Block));
-    disk->readDisk(disk, 0, superBlock->Data);
-    if (superBlock->Super.MagicNumber != MAGIC_NUMBER) {
+    disk->readDisk(disk, 0, superBlock.Data);
+    if (superBlock.Super.MagicNumber != MAGIC_NUMBER) {
         fprintf(stderr, "Invalid valid magic number: %x...\n",
-                superBlock->Super.MagicNumber); // debug
+                superBlock.Super.MagicNumber); // debug
         return false;
     }
     fprintf(stderr, "Valid magic number: %x...\n",
-            superBlock->Super.MagicNumber); // debug
+            superBlock.Super.MagicNumber); // debug
 
-    if (superBlock->Super.Blocks == 0) return false;
+    if (superBlock.Super.Blocks == 0) return false;
 
-    if (superBlock->Super.InodeBlocks != ceil(0.10 * superBlock->Super.Blocks))
+    if (superBlock.Super.InodeBlocks != ceil(0.10 * superBlock.Super.Blocks))
         return false;
 
-    uint32_t inodes = superBlock->Super.Inodes;
+    uint32_t inodes = superBlock.Super.Inodes;
     if (inodes == 0 || inodes % INODES_PER_BLOCK != 0) return false;
 
     // Set device
@@ -374,7 +372,7 @@ ssize_t create() {
     if (inodeidx < 0) return -1;
 
     size_t inodeperblk =
-        superBlock->Super.Inodes / superBlock->Super.InodeBlocks;
+        superBlock.Super.Inodes / superBlock.Super.InodeBlocks;
     size_t bnumber = (inodeidx / inodeperblk) + 1;
 
     // Record inode if found
@@ -419,7 +417,7 @@ bool removeInode(size_t inumber) {
         selfDisk->readDisk(selfDisk, inode.Indirect, indirectBlk.Data);
 
         for (size_t pointer = 0;
-             pointer < POINTERS_PER_BLOCK && pointer < superBlock->Super.Blocks;
+             pointer < POINTERS_PER_BLOCK && pointer < superBlock.Super.Blocks;
              pointer++) {
             // printf("pointer: %d...\n", pointer);
             if (indirectBlk.Pointers[pointer] == 0) continue;
@@ -441,7 +439,7 @@ bool removeInode(size_t inumber) {
 // Inode stat ------------------------------------------------------------------
 
 ssize_t stat(size_t inumber) {
-    if (selfDisk == NULL) {
+    if (!hasDiskMounted()) {
         fprintf(stderr, "Mount disk first...\n");
         return -1;
     }
@@ -486,8 +484,7 @@ size_t readInode(size_t inumber, char *data, size_t length, size_t offset) {
         selfDisk->readDisk(selfDisk, inode.Direct[offsetedDataBlock],
                            block.Data);
 
-        int lenData = fmin(BLOCK_SIZE, strlen(block.Data + offset));
-
+        int lenData = strnlen(block.Data + offset, BLOCK_SIZE);
         int maxCopy = fmin(lenData, length - read);
 
         strncpy(data + read, block.Data + offset, maxCopy);
@@ -511,7 +508,7 @@ size_t readInode(size_t inumber, char *data, size_t length, size_t offset) {
         // at the pointer data block
         size_t pointer = offsetedDataBlock - 5;
         while (read < length && pointer < POINTERS_PER_BLOCK &&
-               pointer < superBlock->Super.Blocks) {
+               pointer < superBlock.Super.Blocks) {
             if (pointers.Pointers[pointer] == 0 ||
                 freeblkmap[pointers.Pointers[pointer]] == 0)
                 break;
@@ -519,18 +516,13 @@ size_t readInode(size_t inumber, char *data, size_t length, size_t offset) {
             selfDisk->readDisk(selfDisk, pointers.Pointers[pointer],
                                block.Data);
 
-            int lenData = fmin(BLOCK_SIZE, strlen(block.Data + offset));
-
+            int lenData = strnlen(block.Data + offset, BLOCK_SIZE);
             int maxCopy = fmin(lenData, length - read);
 
             strncpy(data + read, block.Data + offset, maxCopy);
             bzero(block.Data, BLOCK_SIZE);
 
             read += maxCopy;
-
-            // fprintf(stderr, "====> Read: %d | %d | LEN %d | Offset:%d n",
-            // read, fmin(BLOCK_SIZE, length - read), strlen(block.Data),
-            // offset);
 
             offset = 0;
             pointer++;

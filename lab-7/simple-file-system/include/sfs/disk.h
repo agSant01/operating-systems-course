@@ -2,14 +2,13 @@
 
 #pragma once
 
-#include <stdlib.h>
 #include <stdbool.h>
+#include <stdlib.h>
 
 // Number of bytes per block
 #define BLOCK_SIZE 4096
 
-typedef struct Disk
-{
+typedef struct Disk {
     int FileDescriptor; // File descriptor of disk image
     size_t Blocks;      // Number of blocks in disk image
     size_t Reads;       // Number of reads performed
@@ -22,7 +21,7 @@ typedef struct Disk
     void (*sanity_check)(struct Disk *self, int blocknum, char *data);
 
     // Destructor
-    void (*DiskDestructor)(struct Disk *selft);
+    void (*DiskDestructor)(struct Disk *self);
 
     // Open disk image
     // @param	path	    Path to disk image
