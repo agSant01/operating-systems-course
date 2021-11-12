@@ -537,7 +537,7 @@ Inode 126:
 Inode 127:
     size: 0 bytes
     direct blocks:
-261 disk block reads
+260 disk block reads
 127 disk block writes
 EOF
 }
@@ -546,7 +546,7 @@ cp data/image.5 data/image.5.create
 trap "rm -f data/image.5.create" INT QUIT TERM EXIT
 
 echo -n "Testing create in data/image.5.create ... "
-if diff -q <(test-input | ./bin/sfssh data/image.5.create 5 2> /dev/null) <(test-output); then
+if diff -u <(test-input | ./bin/sfssh data/image.5.create 5 2> /dev/null) <(test-output); then
     echo "Success"
 else
     echo "False"
