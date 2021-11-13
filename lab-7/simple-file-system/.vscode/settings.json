@@ -4,6 +4,6 @@
         "stdbool.h": "c",
         "cmath": "c"
     },
-    "cSpell.words": ["bnumber", "lruinumber"],
+    "cSpell.words": ["bnumber", "inums", "lruinumber"],
     "C_Cpp.clang_format_fallbackStyle": "{ BasedOnStyle: LLVM, IndentWidth: 4, AllowShortIfStatementsOnASingleLine: true, ColumnLimit: 0 }"
 }

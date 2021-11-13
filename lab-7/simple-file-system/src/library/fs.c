@@ -16,10 +16,14 @@ Block superBlock;
 /**
  *  Cache-like implementation for retrieving most recent accessed INODE
  */
-#define CACHE_LEN 8
+#define CACHE_LEN 3
 
-Inode lruinodes[CACHE_LEN] = {0};
-size_t lruinumber[CACHE_LEN] = {0};
+Inode cached_inodes[CACHE_LEN] = {0};
+size_t cached_inums[CACHE_LEN] = {0};
+
+ushort victim = 0;
+ushort referenceBits[CACHE_LEN] = {0};
+ushort filled = 0;
 
 /**
  * @brief Stores the instance of valid iNode in "inode" if there is a cache hit
@@ -29,20 +33,47 @@ size_t lruinumber[CACHE_LEN] = {0};
  * @return bool
  */
 bool cacheLookup(size_t inumber, Inode *inode) {
-    int cp = inumber % CACHE_LEN;
-    if (lruinumber[cp] == inumber + 1) {
-        memcpy(inode, &lruinodes[cp], sizeof(Inode));
-        fprintf(stderr, "Cache hit: %lu\n", inumber);
-        return true;
+    for (ushort i = 0; i < filled; i++) {
+        if (cached_inums[i] == inumber) {
+            referenceBits[i] = 1;
+            memcpy(inode, &cached_inodes[i], sizeof(Inode));
+            fprintf(stderr, "Cache hit: %lu\n", inumber);
+            return true;
+        }
     }
+
     memset(inode, 0, sizeof(Inode));
     return false;
 }
 
 bool cacheUpdate(size_t inumber, Inode *inode) {
-    int cp = inumber % CACHE_LEN;
-    lruinumber[cp] = inumber + 1;
-    memcpy(&lruinodes[cp], inode, sizeof(Inode));
+    // check if exists in cache and update
+    for (ushort i = 0; i < filled; i++) {
+        if (cached_inums[i] == inumber) {
+            referenceBits[i] = 1;
+            memcpy(&cached_inodes[i], inode, sizeof(Inode));
+            return true;
+        }
+    }
+
+    // inode fault, not exists.
+    if (filled == CACHE_LEN) {
+        // find victim
+        while (true) {
+            if (referenceBits[victim] == 0) {
+                memcpy(&cached_inodes[victim], inode, sizeof(Inode));
+                cached_inums[victim] = inumber;
+                break;
+            }
+            referenceBits[victim] = 0;
+            victim = (victim + 1) % CACHE_LEN;
+        }
+    } else {
+        memcpy(&cached_inodes[filled], inode, sizeof(Inode));
+        cached_inums[filled] = inumber;
+        filled++;
+    }
+
     return true;
 }
 
