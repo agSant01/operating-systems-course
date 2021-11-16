@@ -219,7 +219,7 @@ image-20-output() {
 
 0 bytes copied
 0 disk block writes
-21 disk block reads
+20 disk block reads
 27160 bytes copied
 9546 bytes copied
    Abraham Clark
