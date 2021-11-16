@@ -338,7 +338,7 @@ bool copyout(FileSystem *fs, size_t inumber, const char *path)
 	size_t offset = 0;
 	while (true)
 	{
-		size_t result = fs->readInode(inumber, buffer, sizeof(buffer), offset);
+		ssize_t result = fs->readInode(inumber, buffer, sizeof(buffer), offset);
 		if (result <= 0)
 		{
 			break;
