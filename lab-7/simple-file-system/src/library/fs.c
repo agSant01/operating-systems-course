@@ -115,6 +115,18 @@ void printBitmaps() {
     }
 }
 
+void initIndirectBlocks(int indirectBlock) {
+    Block indblock;
+    selfDisk->readDisk(selfDisk, indirectBlock, indblock.Data);
+    for (size_t pointer = 0;
+         pointer < POINTERS_PER_BLOCK && pointer < selfDisk->Blocks;
+         pointer++) {
+        if (indblock.Pointers[pointer] != FREE) {
+            freeblkmap[indblock.Pointers[pointer]] = OCCUPIED;
+        }
+    }
+}
+
 bool initFreeBlocks(Inode *inode) {
     if (inode->Valid == FREE) {
         return true;
@@ -132,6 +144,17 @@ bool initFreeBlocks(Inode *inode) {
         initIndirectBlocks(inode->Indirect);
     }
 
+    if (inode->DoubleIndirect != FREE) {
+        freeblkmap[inode->DoubleIndirect] = OCCUPIED;
+        Block doubleIndBlk;
+        selfDisk->readDisk(selfDisk, inode->DoubleIndirect, doubleIndBlk.Data);
+        for (size_t pointer = 0;
+             pointer < POINTERS_PER_BLOCK && pointer < superBlock.Super.Blocks;
+             pointer++) {
+            if (doubleIndBlk.Pointers[pointer] != FREE)
+                initIndirectBlocks(doubleIndBlk.Pointers[pointer]);
+        }
+    }
 
     return true;
 }
@@ -308,6 +331,19 @@ void debug(Disk *disk) {
                     }
                     printf("\n");
                 }
+
+                if (inode.DoubleIndirect != FREE) {
+                    printf("    double indirect block: %u\n", inode.DoubleIndirect);
+                    printf("    doubly directed indirect data blocks:");
+
+                    Block doubleIndirect;
+                    disk->readDisk(disk, inode.Indirect, doubleIndirect.Data);
+                    for (size_t ind = 0; ind < POINTERS_PER_BLOCK; ind++) {
+                        if (doubleIndirect.Pointers[ind] == 0) break;
+                        printf(" %u", doubleIndirect.Pointers[ind]);
+                    }
+                    printf("\n");
+                }
             }
             inodeIdx++;
         }
@@ -459,6 +495,17 @@ bool removeInode(size_t inumber) {
         inode.Indirect = FREE;
     }
 
+    if (inode.DoubleIndirect != FREE) {
+        Block doubleIndirect;
+        selfDisk->readDisk(selfDisk, inode.DoubleIndirect, doubleIndirect.Data);
+        for (size_t pointer = 0;
+             pointer < POINTERS_PER_BLOCK && pointer < superBlock.Super.Blocks;
+             pointer++) {
+            if (doubleIndirect.Pointers[pointer] != FREE)
+                freeIndirectBlock(doubleIndirect.Pointers[pointer]);
+        }
+        inode.DoubleIndirect = FREE;
+    }
     fprintf(stderr, "freed indirect blocks...\n");
 
     saveInode(inumber, &inode);
@@ -509,13 +556,13 @@ void readFromIndirect(Block *pointers, size_t *pointer, char *data, size_t lengt
     return;
 }
 
-size_t readInode(size_t inumber, char *data, size_t length, size_t offset) {
+ssize_t readInode(size_t inumber, char *data, size_t length, size_t offset) {
     fprintf(stderr, "readInode(inumber:%ld, length:%ld, offset:%ld)\n", inumber,
             length, offset);
     // Load inode information
     Inode inode;
     if (!loadInode(inumber, &inode)) {
-        return 0;
+        return -1;
     }
     // printf("Loaded inode...\n"); // debug
 
@@ -552,7 +599,7 @@ size_t readInode(size_t inumber, char *data, size_t length, size_t offset) {
 
     fprintf(stderr, "Ended reading directs...\n");
     if (inode.Indirect != FREE &&
-        offsetedDataBlock < POINTERS_PER_BLOCK + 5 &&
+        offsetedDataBlock < POINTERS_PER_BLOCK + POINTERS_PER_INODE &&
         read < length) {
         // if (inode.Indirect != FREE) {
         fprintf(stderr, "Started reading indirects...\n");
@@ -562,9 +609,38 @@ size_t readInode(size_t inumber, char *data, size_t length, size_t offset) {
 
         // adjust offsetedDataBlock to start at 0 to account for zero-start
         // at the pointer data block
-        offsetedDataBlock -= POINTERS_PER_INODE;
-        readFromIndirect(&pointers, &offsetedDataBlock, data, length, &read, &offset);
+        size_t pointer = offsetedDataBlock - POINTERS_PER_INODE;
+        readFromIndirect(&pointers, &pointer, data, length, &read, &offset);
+        offsetedDataBlock = pointer + POINTERS_PER_INODE;
     }
+
+    if (inode.DoubleIndirect != FREE && read < length) {
+        fprintf(stderr, "Reading Double Indirect...\n");
+
+        Block doubleIndirect;
+        selfDisk->readDisk(selfDisk, inode.DoubleIndirect, doubleIndirect.Data);
+
+        size_t pointer = offsetedDataBlock - POINTERS_PER_BLOCK - POINTERS_PER_INODE;
+        size_t indirectBlockIdx = (pointer / POINTERS_PER_BLOCK);
+        pointer %= POINTERS_PER_BLOCK;
+
+        while (read < length && indirectBlockIdx < POINTERS_PER_BLOCK) {
+            if (doubleIndirect.Pointers[indirectBlockIdx] == FREE ||
+                freeblkmap[doubleIndirect.Pointers[indirectBlockIdx]] == FREE) break;
+            // get indirect and read
+            Block indirect;
+            selfDisk->readDisk(selfDisk, indirectBlockIdx, indirect.Data);
+
+            readFromIndirect(&indirect, &pointer, data, length, &read, &offset);
+
+            offsetedDataBlock += pointer;
+            indirectBlockIdx++;
+            pointer = 0;
+        }
+    }
+
+    return read;
+}
 
 // Write to inode --------------------------------------------------------------
 
@@ -654,7 +730,7 @@ ssize_t writeInode(size_t inumber, char *data, size_t length, size_t offset) {
 
     // still data to write,
     // use indirect data
-    if (written < length && !isDiskFull) {
+    if (written < length && !isDiskFull && offsetedDataBlock < POINTERS_PER_BLOCK + POINTERS_PER_INODE) {
         fprintf(stderr, "Use indirect...\n");
         ssize_t indblk = allocFreeBlock(inode.Indirect);
 
@@ -663,12 +739,11 @@ ssize_t writeInode(size_t inumber, char *data, size_t length, size_t offset) {
 
             fprintf(stderr, "Indirect block:%ld\n", indblk);
 
-            // adjust offsetedDataBlock to start at 0 to account for zero-start
-            // at the pointer data block
-
             Block pointers;
             selfDisk->readDisk(selfDisk, indblk, pointers.Data);
 
+            // adjust offsetedDataBlock to start at 0 to account for zero-start
+            // at the pointer data block
             offsetedDataBlock -= POINTERS_PER_INODE;
             writeToIndirect(&pointers, &offsetedDataBlock, data, length, &written, &offset);
 
@@ -676,10 +751,46 @@ ssize_t writeInode(size_t inumber, char *data, size_t length, size_t offset) {
         }
     }
 
-    // printf("Saving inode...\n"); // debug
+    // use double indirect block
+    if (written < length) {
+        fprintf(stderr, "Use double indirect...\n");
+        ssize_t doubleIndirect = allocFreeBlock(inode.DoubleIndirect);
+
+        if (doubleIndirect > 0) {
+            Block indirectBlocks;
+            selfDisk->readDisk(selfDisk, doubleIndirect, indirectBlocks.Data);
+
+            size_t pointer = offsetedDataBlock - POINTERS_PER_INODE - POINTERS_PER_BLOCK;
+            size_t indirectBlock = pointer / POINTERS_PER_BLOCK;
+            pointer %= POINTERS_PER_BLOCK;
+
+            while (written < length && indirectBlock < POINTERS_PER_BLOCK) {
+                size_t indBlkAddr = allocFreeBlock(indirectBlocks.Pointers[indirectBlock]);
+
+                if (indBlkAddr <= 0) break;
+
+                indirectBlocks.Pointers[indirectBlock] = indBlkAddr;
+
+                Block indBlock;
+                selfDisk->readDisk(selfDisk, indBlkAddr, indBlock.Data);
+
+                writeToIndirect(&indBlock, &pointer, data, length, &written, &offset);
+
+                offsetedDataBlock += pointer;
+                indirectBlock++;
+                pointer = 0;
+
+                selfDisk->writeDisk(selfDisk, indirectBlock, indBlock.Data);
+            }
+
+            selfDisk->writeDisk(selfDisk, doubleIndirect, indirectBlocks.Data);
+        }
+    }
+
+    fprintf(stderr, "Saving inode...\n"); // debug
     inode.Size = written;
     saveInode(inumber, &inode);
-    // printf("Saved inode...\n");
+    fprintf(stderr, "Saved inode...\n");
 
     return written;
 }

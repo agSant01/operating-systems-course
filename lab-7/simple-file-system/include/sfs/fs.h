@@ -8,7 +8,7 @@
 #include <stdint.h>
 
 #define MAGIC_NUMBER 0xf0f03410
-#define INODES_PER_BLOCK 128
+#define INODES_PER_BLOCK 113
 #define POINTERS_PER_INODE 5
 #define POINTERS_PER_BLOCK 1024
 
@@ -27,7 +27,7 @@ typedef struct Inode {
     uint32_t Size;                       // Size of file
     uint32_t Direct[POINTERS_PER_INODE]; // Direct pointers
     uint32_t Indirect;                   // Indirect pointer
-    //uint32_t DoubleIndirect;	// Double Indirect pointer
+    uint32_t DoubleIndirect;             // Double Indirect pointer
 } Inode;
 
 typedef union Block {
@@ -48,7 +48,7 @@ typedef struct FileSystem {
     bool (*removeInode)(size_t inumber);
     ssize_t (*stat)(size_t inumber);
 
-    size_t (*readInode)(size_t inumber, char *data, size_t length, size_t offset);
+    ssize_t (*readInode)(size_t inumber, char *data, size_t length, size_t offset);
     ssize_t (*writeInode)(size_t inumber, char *data, size_t length, size_t offset);
 
 } FileSystem;
