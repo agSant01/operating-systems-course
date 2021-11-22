@@ -2,7 +2,7 @@ CXX= gcc
 # CXXFLAGS= 	-g -gdwarf-2 -std=gnu++11 -Wall -Iinclude -fPIC
 CXXFLAGS=   -Wall -Iinclude -fPIC -g
 LDFLAGS=	-Llib
-AR=		ar
+AR=			ar
 ARFLAGS=	rcs
 
 LIB_HEADERS=	$(wildcard include/sfs/*.h)
@@ -27,6 +27,9 @@ $(SHELL_PROGRAM):	$(SHELL_OBJECTS) $(LIB_STATIC)
 
 test:	$(SHELL_PROGRAM)
 	@for test_script in tests/test_*.sh; do $${test_script}; done
+
+test2:
+	@for test_script in tests/double-indirect/test_*.sh; do $${test_script}; done
 
 clean:
 	rm -f $(LIB_OBJECTS) $(LIB_STATIC) $(SHELL_OBJECTS) $(SHELL_PROGRAM)
